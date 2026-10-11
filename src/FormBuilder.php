@@ -1297,8 +1297,21 @@ class FormBuilder
         }
 
         if (function_exists('app')) {
-            $hasNullMiddleware = app("Illuminate\Contracts\Http\Kernel")
-                ->hasMiddleware(ConvertEmptyStringsToNull::class);
+            $hasNullMiddleware = false;
+
+            //Laravel 11+ dissolved the HTTP kernel; probe it defensively.
+            $nullMiddlewareClass = class_exists(\Illuminate\Foundation\Configuration\Middleware\ConvertEmptyStringsToNull::class)
+                ? \Illuminate\Foundation\Configuration\Middleware\ConvertEmptyStringsToNull::class
+                : ConvertEmptyStringsToNull::class;
+
+            try {
+                $kernel = app(\Illuminate\Contracts\Http\Kernel::class);
+                if (method_exists($kernel, 'hasMiddleware')) {
+                    $hasNullMiddleware = $kernel->hasMiddleware($nullMiddlewareClass);
+                }
+            } catch (\Throwable $e) {
+                $hasNullMiddleware = false;
+            }
 
             if ($hasNullMiddleware
                 && is_null($old)
